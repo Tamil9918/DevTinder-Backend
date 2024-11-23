@@ -2,16 +2,13 @@ require("dotenv").config();
 const express = require("express");
 
 const app = express();
-
-app.use(
-  "/test",
-  (req, res, next) => {
-    next();
-  },
-  (req, res) => {
-    res.send("hi");
+const { adminAuth, userAuth } = require("./middlewares/auth");
+app.use("/admin", adminAuth);
+app.use("/", (err, req, res, next) => {
+  if (err) {
+    res.status(500).send("Something went wrong");
   }
-);
+});
 
 app.listen(process.env.PORT, () => {
   console.log(
