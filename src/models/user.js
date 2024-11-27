@@ -60,6 +60,13 @@ userSchema.methods.getJWT = async function () {
   return token;
 };
 
+userSchema.methods.encryptPassword = async function (inputPassword) {
+  if (!validator.isStrongPassword(inputPassword)) {
+    throw new Error("Password is not strong enough!");
+  }
+  const passwordHash = await bcrypt.hash(inputPassword, 10);
+  return passwordHash;
+};
 userSchema.methods.validatePassword = async function (inputPassword) {
   const user = this;
   const isPasswordValid = await bcrypt.compare(inputPassword, user.password);
