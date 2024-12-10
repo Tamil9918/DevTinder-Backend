@@ -10,7 +10,9 @@ const userRouter = require("./routes/user.js");
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors());
+
+const corsOption = { origin: "http://localhost:5173", credentials: true };
+app.use(cors(corsOption));
 
 app.use("/", [authRouter, profileRouter, requestRouter, userRouter]);
 

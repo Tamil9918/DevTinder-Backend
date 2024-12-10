@@ -43,7 +43,7 @@ authRouter.post("/login", async (req, res) => {
         //create a JWT Token
         const token = await user.getJWT();
         //Add token to cookie and send response back to client
-        res.cookie("token", token).send("Login Successful!");
+        res.cookie("token", token).send(user);
       } else {
         throw new Error("Password is not correct!");
       }
