@@ -25,12 +25,18 @@ EXPOSE 8080
 RUN echo '#!/bin/bash' > /usr/local/bin/startup.sh && \
     echo 'set -e' >> /usr/local/bin/startup.sh && \
     echo 'log() { echo "$(date +"%Y-%m-%d %H:%M:%S") [startup.sh]: $*"; }' >> /usr/local/bin/startup.sh && \
-    echo 'log "Starting Tomcat..."; catalina.sh run &' >> /usr/local/bin/startup.sh && \
-    echo 'log "Waiting for GeoServer to deploy..."; while [ ! -d "$CATALINA_HOME/webapps/geoserver/WEB-INF" ]; do sleep 2; done; log "GeoServer deployed."' >> /usr/local/bin/startup.sh && \
-    echo 'CUSTOM_WEB_XML="/opt/config_overrides/web.xml"' >> /usr/local/bin/startup.sh && \
+    echo 'CUSTOM_WEB_XML="${CONFIG_OVERRIDES_DIR}/web.xml"' >> /usr/local/bin/startup.sh && \
     echo 'DEFAULT_WEB_XML="$CATALINA_HOME/webapps/geoserver/WEB-INF/web.xml"' >> /usr/local/bin/startup.sh && \
-    echo 'if [ -f "$CUSTOM_WEB_XML" ]; then log "Custom web.xml found at $CUSTOM_WEB_XML."; if [ -f "$DEFAULT_WEB_XML" ]; then log "Removing default web.xml at $DEFAULT_WEB_XML..."; rm -f "$DEFAULT_WEB_XML"; fi; log "Copying custom web.xml to $DEFAULT_WEB_XML..."; cp "$CUSTOM_WEB_XML" "$DEFAULT_WEB_XML"; chmod 644 "$DEFAULT_WEB_XML"; else log "Custom web.xml not found. Default configuration will remain."; fi' >> /usr/local/bin/startup.sh && \
-    echo 'wait' >> /usr/local/bin/startup.sh && \
+    echo 'log "Checking for custom web.xml...";' >> /usr/local/bin/startup.sh && \
+    echo 'if [ -f "$CUSTOM_WEB_XML" ]; then' >> /usr/local/bin/startup.sh && \
+    echo '    log "Custom web.xml found. Replacing default web.xml...";' >> /usr/local/bin/startup.sh && \
+    echo '    while [ ! -d "$CATALINA_HOME/webapps/geoserver/WEB-INF" ]; do sleep 2; done;' >> /usr/local/bin/startup.sh && \
+    echo '    rm -f "$DEFAULT_WEB_XML" && cp "$CUSTOM_WEB_XML" "$DEFAULT_WEB_XML" && chmod 644 "$DEFAULT_WEB_XML";' >> /usr/local/bin/startup.sh && \
+    echo '    log "Custom web.xml successfully replaced.";' >> /usr/local/bin/startup.sh && \
+    echo 'else' >> /usr/local/bin/startup.sh && \
+    echo '    log "Custom web.xml not found. Using default configuration.";' >> /usr/local/bin/startup.sh && \
+    echo 'fi' >> /usr/local/bin/startup.sh && \
+    echo 'log "Starting Tomcat..."; catalina.sh run;' >> /usr/local/bin/startup.sh && \
     chmod +x /usr/local/bin/startup.sh
 
 # Use the custom startup script as the container's entry point
