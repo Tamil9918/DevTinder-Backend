@@ -21,22 +21,40 @@ RUN mkdir -p ${GEOSERVER_DATA_DIR} && \
 # Expose the required port for GeoServer
 EXPOSE 8080
 
-# Add a startup script to manage deployment and custom configuration
+
+# Create directory for configuration overrides
+RUN mkdir -p ${CONFIG_OVERRIDES_DIR}
+
+# Copy custom web.xml to the configuration overrides directory (if available)
+# This will be overridden by a ConfigMap in Kubernetes
+COPY web.xml ${CONFIG_OVERRIDES_DIR}/web.xml
+
+# Startup script
 RUN echo '#!/bin/bash' > /usr/local/bin/startup.sh && \
     echo 'set -e' >> /usr/local/bin/startup.sh && \
     echo 'log() { echo "$(date +"%Y-%m-%d %H:%M:%S") [startup.sh]: $*"; }' >> /usr/local/bin/startup.sh && \
-    echo 'CUSTOM_WEB_XML="${CONFIG_OVERRIDES_DIR}/web.xml"' >> /usr/local/bin/startup.sh && \
-    echo 'DEFAULT_WEB_XML="$CATALINA_HOME/webapps/geoserver/WEB-INF/web.xml"' >> /usr/local/bin/startup.sh && \
-    echo 'log "Checking for custom web.xml...";' >> /usr/local/bin/startup.sh && \
-    echo 'if [ -f "$CUSTOM_WEB_XML" ]; then' >> /usr/local/bin/startup.sh && \
-    echo '    log "Custom web.xml found. Replacing default web.xml...";' >> /usr/local/bin/startup.sh && \
-    echo '    while [ ! -d "$CATALINA_HOME/webapps/geoserver/WEB-INF" ]; do sleep 2; done;' >> /usr/local/bin/startup.sh && \
-    echo '    rm -f "$DEFAULT_WEB_XML" && cp "$CUSTOM_WEB_XML" "$DEFAULT_WEB_XML" && chmod 644 "$DEFAULT_WEB_XML";' >> /usr/local/bin/startup.sh && \
-    echo '    log "Custom web.xml successfully replaced.";' >> /usr/local/bin/startup.sh && \
+    echo 'log "Disabling auto-deployment by renaming geoserver.war..."' >> /usr/local/bin/startup.sh && \
+    echo 'mv "$CATALINA_HOME/webapps/geoserver.war" "$CATALINA_HOME/webapps/geoserver.war.disabled"' >> /usr/local/bin/startup.sh && \
+    echo 'log "Starting Tomcat to initialize GeoServer WAR..."' >> /usr/local/bin/startup.sh && \
+    echo 'catalina.sh start &' >> /usr/local/bin/startup.sh && \
+    echo 'log "Waiting for GeoServer WAR to be unzipped..."' >> /usr/local/bin/startup.sh && \
+    echo 'while [ ! -d "$CATALINA_HOME/webapps/geoserver/WEB-INF" ]; do sleep 2; done' >> /usr/local/bin/startup.sh && \
+    echo 'log "GeoServer WAR unzipped."' >> /usr/local/bin/startup.sh && \
+    echo 'if [ -f "$CONFIG_OVERRIDES_DIR/web.xml" ]; then' >> /usr/local/bin/startup.sh && \
+    echo '  log "Custom web.xml found at $CONFIG_OVERRIDES_DIR/web.xml. Replacing default web.xml..."' >> /usr/local/bin/startup.sh && \
+    echo '  rm -f "$CATALINA_HOME/webapps/geoserver/WEB-INF/web.xml"' >> /usr/local/bin/startup.sh && \
+    echo '  cp "$CONFIG_OVERRIDES_DIR/web.xml" "$CATALINA_HOME/webapps/geoserver/WEB-INF/web.xml"' >> /usr/local/bin/startup.sh && \
+    echo '  chmod 644 "$CATALINA_HOME/webapps/geoserver/WEB-INF/web.xml"' >> /usr/local/bin/startup.sh && \
+    echo '  log "Custom web.xml successfully replaced."' >> /usr/local/bin/startup.sh && \
     echo 'else' >> /usr/local/bin/startup.sh && \
-    echo '    log "Custom web.xml not found. Using default configuration.";' >> /usr/local/bin/startup.sh && \
+    echo '  log "Custom web.xml not found. Using default configuration."' >> /usr/local/bin/startup.sh && \
     echo 'fi' >> /usr/local/bin/startup.sh && \
-    echo 'log "Starting Tomcat..."; catalina.sh run;' >> /usr/local/bin/startup.sh && \
+    echo 'log "Re-enabling GeoServer WAR for deployment..."' >> /usr/local/bin/startup.sh && \
+    echo 'mv "$CATALINA_HOME/webapps/geoserver.war.disabled" "$CATALINA_HOME/webapps/geoserver.war"' >> /usr/local/bin/startup.sh && \
+    echo 'log "Restarting Tomcat to deploy GeoServer..."' >> /usr/local/bin/startup.sh && \
+    echo 'catalina.sh stop || log "Tomcat stop command failed. Continuing..."' >> /usr/local/bin/startup.sh && \
+    echo 'sleep 5' >> /usr/local/bin/startup.sh && \
+    echo 'catalina.sh run' >> /usr/local/bin/startup.sh && \
     chmod +x /usr/local/bin/startup.sh
 
 # Use the custom startup script as the container's entry point
